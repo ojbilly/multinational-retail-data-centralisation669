@@ -1,0 +1,13 @@
+source_db:
+  RDS_HOST: data-handling-project-readonly.cq2e8zno855e.eu-west-1.rds.amazonaws.com
+  RDS_PASSWORD: AiCore2022
+  RDS_USER: aicore_admin
+  RDS_DATABASE: postgres
+  RDS_PORT: 5432
+
+target_db:
+  RDS_HOST: my-first-rds-db.czwkq4qu21jv.eu-north-1.rds.amazonaws.com
+  RDS_PASSWORD: Educational1234#
+  RDS_USER: postgres
+  RDS_DATABASE: sales_data
+  RDS_PORT: 5432
