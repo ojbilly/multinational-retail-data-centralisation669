@@ -2,10 +2,15 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine.base import Engine
 import pandas as pd
 import yaml
+from typing import Dict, List
 
 
 class DatabaseConnector:
-    def read_db_creds(self, creds_file: str) -> dict:
+    """
+    A utility class for managing database connections and operations.
+    """
+
+    def read_db_credentials(self, creds_file: str) -> Dict[str, Dict[str, str]]:
         """
         Read database credentials from a YAML file.
 
@@ -13,18 +18,24 @@ class DatabaseConnector:
             creds_file (str): Path to the YAML file containing database credentials.
 
         Returns:
-            dict: A dictionary containing the database credentials.
+            Dict[str, Dict[str, str]]: A dictionary containing the database credentials.
         """
         try:
-            with open(creds_file, 'r') as file:
-                creds = yaml.safe_load(file)
-            print("Database credentials successfully read.")
-            return creds
-        except Exception as e:
-            print(f"Error reading database credentials: {e}")
+            with open(creds_file, "r") as file:
+                credentials = yaml.safe_load(file)
+            print("Database credentials successfully loaded.")
+            return credentials
+        except FileNotFoundError:
+            print(f"Error: File '{creds_file}' not found.")
+            raise
+        except yaml.YAMLError as error:
+            print(f"Error reading YAML file: {error}")
+            raise
+        except Exception as error:
+            print(f"Unexpected error reading database credentials: {error}")
             raise
 
-    def init_db_engine(self, creds_file: str, db_key: str) -> Engine:
+    def initialize_db_engine(self, creds_file: str, db_key: str) -> Engine:
         """
         Initialize and return a database engine using credentials from a YAML file.
 
@@ -33,29 +44,30 @@ class DatabaseConnector:
             db_key (str): Key in the credentials file to select specific database credentials.
 
         Returns:
-            Engine: SQLAlchemy engine object.
+            Engine: SQLAlchemy engine object for database connection.
         """
         try:
-            creds = self.read_db_creds(creds_file)
+            credentials = self.read_db_credentials(creds_file)
 
-            # Validate the db_key
-            if db_key not in creds:
-                raise ValueError(
-                    f"Database key '{db_key}' not found in credentials file.")
+            if db_key not in credentials:
+                raise KeyError(f"Database key '{db_key}' not found in credentials file.")
 
-            db_creds = creds[db_key]
+            db_creds = credentials[db_key]
             connection_string = (
                 f"postgresql+psycopg2://{db_creds['RDS_USER']}:{db_creds['RDS_PASSWORD']}"
                 f"@{db_creds['RDS_HOST']}:{db_creds['RDS_PORT']}/{db_creds['RDS_DATABASE']}"
             )
             engine = create_engine(connection_string)
-            print(f"Database engine for '{db_key}' successfully initialized.")
+            print(f"Database engine for '{db_key}' initialized successfully.")
             return engine
-        except Exception as e:
-            print(f"Error initializing database engine: {e}")
+        except KeyError as error:
+            print(f"Error: {error}")
+            raise
+        except Exception as error:
+            print(f"Error initializing database engine: {error}")
             raise
 
-    def list_db_tables(self, engine: Engine) -> list:
+    def list_database_tables(self, engine: Engine) -> List[str]:
         """
         List all tables in the connected database.
 
@@ -63,18 +75,18 @@ class DatabaseConnector:
             engine (Engine): SQLAlchemy engine object.
 
         Returns:
-            list: A list of table names in the database.
+            List[str]: A list of table names in the database.
         """
         try:
             inspector = inspect(engine)
             tables = inspector.get_table_names()
-            print("Tables in the database:", tables)
+            print(f"Tables in the database: {tables}")
             return tables
-        except Exception as e:
-            print(f"Error listing database tables: {e}")
+        except Exception as error:
+            print(f"Error listing database tables: {error}")
             raise
 
-    def upload_data(self, df: pd.DataFrame, table_name: str, engine: Engine, if_exists: str = 'replace', index: bool = False):
+    def upload_dataframe(self, df: pd.DataFrame, table_name: str, engine: Engine, if_exists: str = "replace", index: bool = False):
         """
         Upload a Pandas DataFrame to a database table.
 
@@ -86,13 +98,13 @@ class DatabaseConnector:
             index (bool): Whether to include the DataFrame's index as a column in the table.
         """
         try:
-            df.to_sql(table_name, engine, if_exists=if_exists, index=index)
-            print(f"Data successfully uploaded to the table '{table_name}'.")
-        except Exception as e:
-            print(f"Error uploading data to the database: {e}")
+            df.to_sql(table_name, con=engine, if_exists=if_exists, index=index)
+            print(f"Data successfully uploaded to table '{table_name}'.")
+        except Exception as error:
+            print(f"Error uploading data to the database: {error}")
             raise
 
-    def upload_to_db(self, df: pd.DataFrame, table_name: str, creds_file: str, db_key: str, if_exists: str = 'replace', index: bool = False):
+    def upload_data_to_db(self, df: pd.DataFrame, table_name: str, creds_file: str, db_key: str, if_exists: str = "replace", index: bool = False):
         """
         Upload a Pandas DataFrame to a database table using credentials from a YAML file.
 
@@ -101,18 +113,25 @@ class DatabaseConnector:
             table_name (str): Name of the target table in the database.
             creds_file (str): Path to the YAML file containing database credentials.
             db_key (str): Key in the credentials file to select specific database credentials.
-            if_exists (str): Behavior if the table already exists ('fail', 'replace', 'append'). Defaults to 'replace'.
-            index (bool): Whether to include the DataFrame's index as a column in the table. Defaults to False.
+            if_exists (str): Behavior if the table already exists ('fail', 'replace', 'append').
+            index (bool): Whether to include the DataFrame's index as a column in the table.
         """
         try:
-            engine = self.init_db_engine(creds_file, db_key)
-            self.upload_data(df, table_name, engine,
-                             if_exists=if_exists, index=index)
-        except Exception as e:
-            print(f"Error uploading data to the database: {e}")
+            engine = self.initialize_db_engine(creds_file, db_key)
+            self.upload_dataframe(df, table_name, engine, if_exists=if_exists, index=index)
+        except Exception as error:
+            print(f"Error uploading data to the database: {error}")
             raise
 
-# Example usage:
-# connector = DatabaseConnector()
-# df = pd.DataFrame({"col1": [1, 2], "col2": ["A", "B"]})
-# connector.upload_to_db(df, "test_table", "db_creds.yaml", db_key="target_db")
+
+if __name__ == "__main__":
+    # Example usage
+    connector = DatabaseConnector()
+    example_df = pd.DataFrame({"column1": [1, 2], "column2": ["A", "B"]})
+    creds_path = "db_creds.yaml"
+    table_name = "example_table"
+
+    try:
+        connector.upload_data_to_db(example_df, table_name, creds_path, db_key="target_db")
+    except Exception as e:
+        print(f"Error during upload: {e}")
