@@ -1,6 +1,7 @@
 # Data Handling Project
 
 ## Table of Contents
+
 1. [Project Description](#project-description)
 2. [Installation](#installation)
 3. [Usage](#usage)
@@ -10,11 +11,13 @@
 ## Project Description
 
 This project is designed to handle data extraction, cleaning, and uploading processes from various sources, including databases, APIs, PDFs, and S3 storage. The aim is to ensure data integrity and usability by performing the following tasks:
+
 - Extracting data from RDS databases, APIs, PDFs, and S3.
 - Cleaning data to remove inconsistencies, NULL values, and formatting errors.
 - Uploading cleaned data into a target database for further use.
 
 ### What I Learned
+
 - Implementing data cleaning processes with `pandas`.
 - Utilizing `SQLAlchemy` to manage database connections and operations.
 - Automating API interactions and extracting structured data from JSON and PDF formats.
@@ -26,18 +29,22 @@ This project is designed to handle data extraction, cleaning, and uploading proc
 To run this project, follow these steps:
 
 1. Clone this repository:
+
    ```bash
    git clone https://github.com/your-repo/data-handling-project.git
    cd data-handling-project
    ```
 
 2. Install required dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. Set up database credentials:
+
    - Place your database credentials in the `db_creds.yaml` file. Ensure the format matches:
+
      ```yaml
      source_db:
        RDS_HOST: <source-host>
@@ -66,6 +73,7 @@ To run this project, follow these steps:
    Run the `upload_cleaned_data.py` script to upload cleaned data to the target database.
 
    Example usage:
+
    ```bash
    python upload_cleaned_data.py
    ```
@@ -83,4 +91,4 @@ To run this project, follow these steps:
 
 ## License
 
-This project created by Osaze Omoruyi.
+This project created by Osaze Omoruyi(OJ).
