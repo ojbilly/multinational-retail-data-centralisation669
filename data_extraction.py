@@ -6,18 +6,23 @@ from tabula import read_pdf
 import requests
 import boto3
 from io import StringIO
+from typing import Dict
 
 
 class DataExtractor:
-    def read_rds_table(self, connector: DatabaseConnector, table_name: str, creds_file: str, db_key: str) -> pd.DataFrame:
+    """
+    A class for extracting data from various sources, including databases, APIs, PDFs, and S3 storage.
+    """
+
+    def extract_table_from_rds(self, connector: DatabaseConnector, table_name: str, creds_file: str, db_key: str) -> pd.DataFrame:
         """
-        Extract data from an RDS database table into a Pandas DataFrame.
+        Extract a table from an RDS database into a Pandas DataFrame.
 
         Args:
-            connector (DatabaseConnector): Instance of the DatabaseConnector class.
-            table_name (str): Name of the table to extract data from.
-            creds_file (str): Path to the YAML file containing database credentials.
-            db_key (str): Key in the credentials file to use for database connection (e.g., "source_db" or "target_db").
+            connector (DatabaseConnector): Instance to manage the database connection.
+            table_name (str): Name of the table to extract.
+            creds_file (str): Path to the credentials file.
+            db_key (str): Key in the credentials file for the specific database.
 
         Returns:
             pd.DataFrame: DataFrame containing the table data.
@@ -27,136 +32,117 @@ class DataExtractor:
             tables = connector.list_db_tables(engine)
 
             if table_name not in tables:
-                raise ValueError(
-                    f"Table '{table_name}' not found in the database. Available tables: {tables}"
-                )
+                raise ValueError(f"Table '{table_name}' not found. Available tables: {tables}")
 
-            df = pd.read_sql_table(table_name, con=engine)
+            data_frame = pd.read_sql_table(table_name, con=engine)
             print(f"Data successfully extracted from table: {table_name}")
-            return df
-        except Exception as e:
-            print(f"Error extracting data from RDS table: {e}")
+            return data_frame
+        except Exception as error:
+            print(f"Error extracting table from RDS: {error}")
             raise
 
-    def retrieve_pdf_data(self, pdf_link: str) -> pd.DataFrame:
+    def extract_data_from_pdf(self, pdf_url: str) -> pd.DataFrame:
         """
-        Extract data from a PDF file using tabula-py and return a Pandas DataFrame.
+        Extract data from a PDF file and return it as a Pandas DataFrame.
 
         Args:
-            pdf_link (str): URL or path to the PDF file.
+            pdf_url (str): URL or local path to the PDF file.
 
         Returns:
-            pd.DataFrame: DataFrame containing the extracted data.
+            pd.DataFrame: DataFrame containing extracted data.
         """
         try:
-            df_list = read_pdf(pdf_link, pages="all",
-                               multiple_tables=True, stream=True)
-            df = pd.concat(df_list, ignore_index=True)
+            tables = read_pdf(pdf_url, pages="all", multiple_tables=True, stream=True)
+            data_frame = pd.concat(tables, ignore_index=True)
             print("Data successfully extracted from PDF.")
-            return df
-        except Exception as e:
-            print(f"Error extracting data from PDF: {e}")
+            return data_frame
+        except Exception as error:
+            print(f"Error extracting data from PDF: {error}")
             raise
 
-    def list_number_of_stores(self, endpoint: str, headers: dict) -> int:
+    def fetch_store_count(self, api_endpoint: str, headers: Dict[str, str]) -> int:
         """
-        Retrieve the number of stores from the API.
+        Fetch the total number of stores from an API endpoint.
 
         Args:
-            endpoint (str): API endpoint to retrieve the number of stores.
-            headers (dict): Dictionary containing the API header details.
+            api_endpoint (str): API endpoint to retrieve the count.
+            headers (dict): Headers for the API request.
 
         Returns:
             int: Number of stores.
         """
         try:
-            response = requests.get(endpoint, headers=headers)
+            response = requests.get(api_endpoint, headers=headers)
             response.raise_for_status()
             data = response.json()
-            print(f"API response: {data}")
-
-            number_of_stores = data.get("number_stores", 0)
-            print(f"Number of stores retrieved: {number_of_stores}")
-            return number_of_stores
-        except Exception as e:
-            print(f"Error retrieving the number of stores: {e}")
+            store_count = data.get("number_stores", 0)
+            print(f"Number of stores retrieved: {store_count}")
+            return store_count
+        except Exception as error:
+            print(f"Error fetching store count: {error}")
             raise
 
-    def retrieve_stores_data(self, store_endpoint: str, headers: dict, number_of_stores: int) -> pd.DataFrame:
+    def fetch_store_data(self, store_endpoint: str, headers: Dict[str, str], total_stores: int) -> pd.DataFrame:
         """
-        Retrieve data for all stores from the API and save them in a Pandas DataFrame.
+        Retrieve store data for a given number of stores.
 
         Args:
-            store_endpoint (str): API endpoint to retrieve store details.
-            headers (dict): Dictionary containing the API header details.
-            number_of_stores (int): Number of stores to retrieve.
+            store_endpoint (str): API endpoint for store details.
+            headers (dict): Headers for the API request.
+            total_stores (int): Total number of stores to fetch.
 
         Returns:
-            pd.DataFrame: DataFrame containing data for all stores.
+            pd.DataFrame: DataFrame containing store data.
         """
-        all_stores = []
-        errors = []
-
-        for store_number in range(1, number_of_stores + 1):
+        store_data = []
+        for store_id in range(1, total_stores + 1):
             try:
-                url = store_endpoint.format(store_number=store_number)
-                response = requests.get(url, headers=headers)
+                response = requests.get(store_endpoint.format(store_number=store_id), headers=headers)
                 response.raise_for_status()
-                store_data = response.json()
-                all_stores.append(store_data)
-            except requests.exceptions.RequestException as req_err:
-                print(f"Error for store_number={store_number}: {req_err}")
-                errors.append(
-                    {"store_number": store_number, "error": str(req_err)})
+                store_data.append(response.json())
+            except requests.RequestException as error:
+                print(f"Error fetching store {store_id}: {error}")
 
-        df = pd.DataFrame(all_stores)
-        if errors:
-            print(f"Errors encountered for {len(errors)} stores.")
-        return df
+        return pd.DataFrame(store_data)
 
-    def extract_from_s3(self, s3_address: str) -> pd.DataFrame:
+    def extract_data_from_s3(self, s3_path: str) -> pd.DataFrame:
         """
-        Download and extract data from an S3 bucket and return it as a Pandas DataFrame.
+        Extract data from an S3 bucket.
 
         Args:
-            s3_address (str): S3 address of the file.
+            s3_path (str): S3 file path in the format s3://bucket-name/file-path.
 
         Returns:
-            pd.DataFrame: DataFrame containing the extracted data.
+            pd.DataFrame: DataFrame containing extracted data.
         """
         try:
-            s3_components = s3_address.replace("s3://", "").split("/", 1)
-            bucket_name, key = s3_components[0], s3_components[1]
-
+            bucket, key = s3_path.replace("s3://", "").split("/", 1)
             s3_client = boto3.client("s3")
-            response = s3_client.get_object(Bucket=bucket_name, Key=key)
-            df = pd.read_csv(StringIO(response["Body"].read().decode("utf-8")))
-            print("Data successfully extracted from S3.")
-            return df
-        except Exception as e:
-            print(f"Error extracting data from S3: {e}")
+            obj = s3_client.get_object(Bucket=bucket, Key=key)
+            data_frame = pd.read_csv(StringIO(obj["Body"].read().decode("utf-8")))
+            print(f"Data successfully extracted from S3: {s3_path}")
+            return data_frame
+        except Exception as error:
+            print(f"Error extracting data from S3: {error}")
             raise
 
 
-# Example usage for testing:
 if __name__ == "__main__":
+    # Example usage
     extractor = DataExtractor()
     headers = {"x-api-key": "your_api_key"}
-    number_stores_endpoint = "https://api.example.com/number_stores"
-    store_endpoint = "https://api.example.com/store_details/{store_number}"
+    endpoint_count = "https://api.example.com/number_stores"
+    endpoint_store = "https://api.example.com/store_details/{store_number}"
     s3_address = "s3://bucket-name/products.csv"
 
-    # List number of stores
     try:
-        number_of_stores = extractor.list_number_of_stores(
-            number_stores_endpoint, headers)
-        print(f"Total stores: {number_of_stores}")
+        store_count = extractor.fetch_store_count(endpoint_count, headers)
+        print(f"Store Count: {store_count}")
     except Exception as e:
         print(e)
 
-    # Retrieve and extract S3 data
     try:
-        df = extractor.extract_from_s3(s3_address)
-        print(df.head())
+        data_frame = extractor.extract_data_from_s3(s3_address)
+        print(data_frame.head())
     except Exception as e:
         print(e)
