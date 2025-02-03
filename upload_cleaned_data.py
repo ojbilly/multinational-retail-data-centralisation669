@@ -1,34 +1,31 @@
 import pandas as pd
 from database_utils import DatabaseConnector
-from data_extraction import DataExtractor
-import requests
+from data_cleaning import DataCleaning  # Import the DataCleaning class
 
 
-def extract_data_from_json(json_url: str) -> pd.DataFrame:
+def pull_data_from_database(connector: DatabaseConnector, table_name: str, creds_file: str, db_key: str) -> pd.DataFrame:
     """
-    Extract data from a JSON URL and load it into a Pandas DataFrame.
+    Pull data from the database table into a Pandas DataFrame.
 
     Args:
-        json_url (str): URL of the JSON file.
+        connector (DatabaseConnector): Instance of the DatabaseConnector class.
+        table_name (str): Name of the target table in the database (dim_products).
+        creds_file (str): Path to the database credentials file.
+        db_key (str): Key in the credentials file for the target database (sales_data).
 
     Returns:
-        pd.DataFrame: DataFrame containing the extracted JSON data.
+        pd.DataFrame: DataFrame containing the data from the specified database table.
     """
     try:
-        print(f"Extracting data from JSON URL: {json_url}")
-        response = requests.get(json_url)
-        response.raise_for_status()
-        data_frame = pd.read_json(response.text)
-        print("Data successfully extracted from JSON URL.")
+        print(f"Pulling data from the database table: {table_name}")
+        engine = connector.initialize_db_engine(
+            creds_file, db_key=db_key)  # Initialize DB engine
+        data_frame = connector.fetch_data(
+            table_name, engine)  # Use the fetch_data method
+        print(f"Data successfully pulled from table '{table_name}'.")
         return data_frame
-    except requests.RequestException as req_error:
-        print(f"HTTP error occurred: {req_error}")
-        raise
-    except ValueError as json_error:
-        print(f"Error decoding JSON: {json_error}")
-        raise
     except Exception as error:
-        print(f"Unexpected error occurred: {error}")
+        print(f"Error pulling data from the database: {error}")
         raise
 
 
@@ -38,16 +35,18 @@ def upload_data_to_database(data_frame: pd.DataFrame, table_name: str, connector
 
     Args:
         data_frame (pd.DataFrame): DataFrame to upload.
-        table_name (str): Name of the target table in the database.
+        table_name (str): Name of the target table in the database (dim_products).
         connector (DatabaseConnector): Instance of the DatabaseConnector class.
         creds_file (str): Path to the database credentials file.
-        db_key (str): Key in the credentials file for the target database.
+        db_key (str): Key in the credentials file for the target database (sales_data).
     """
     try:
-        print(f"Uploading data to the database table: {table_name}")
-        engine = connector.init_db_engine(creds_file, db_key=db_key)
-        data_frame.to_sql(table_name, engine, if_exists="replace", index=False)
-        print(f"Data successfully uploaded to table '{table_name}'.")
+        print(f"Uploading cleaned data to the database table: {table_name}")
+        engine = connector.initialize_db_engine(
+            creds_file, db_key=db_key)  # Initialize DB engine
+        connector.upload_data_to_db(
+            data_frame, table_name, creds_file, db_key)  # Upload cleaned data
+        print(f"Cleaned data successfully uploaded to table '{table_name}'.")
     except Exception as error:
         print(f"Error uploading data to the database: {error}")
         raise
@@ -56,19 +55,26 @@ def upload_data_to_database(data_frame: pd.DataFrame, table_name: str, connector
 if __name__ == "__main__":
     # Configuration
     creds_file_path = "db_creds.yaml"
-    target_table_name = "dim_date_times"
-    database_key = "target_db"
-    json_data_url = "https://data-handling-public.s3.eu-west-1.amazonaws.com/date_details.json"
+    target_table_name = "dim_products"  # Table in sales_data database
+    database_key = "target_db"  # Key for target database in creds file
 
     # Initialize classes
     db_connector = DatabaseConnector()
+    cleaner = DataCleaning()  # Initialize DataCleaning class
 
     try:
-        # Step 1: Extract data from the JSON URL
-        extracted_data = extract_data_from_json(json_data_url)
+        # Step 1: Pull data from the target database table (dim_products) in the sales_data database
+        extracted_data = pull_data_from_database(
+            db_connector, target_table_name, creds_file_path, database_key)
 
-        # Step 2: Upload extracted data to the database
-        upload_data_to_database(extracted_data, target_table_name, db_connector, creds_file_path, database_key)
+        # Step 2: Clean the extracted data using the DataCleaning class
+        cleaned_data = cleaner.clean_and_cast_products_data(
+            extracted_data)  # Clean and cast data
+
+        # Step 3: Upload cleaned data back to the dim_products table in the sales_data database
+        upload_data_to_database(
+            cleaned_data, target_table_name, db_connector, creds_file_path, database_key)
+
     except Exception as e:
         print(f"Process failed: {e}")
         exit(1)

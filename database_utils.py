@@ -41,7 +41,7 @@ class DatabaseConnector:
 
         Args:
             creds_file (str): Path to the YAML file containing database credentials.
-            db_key (str): Key in the credentials file to select specific database credentials.
+            db_key (str): Key in the credentials file to retrieve database credentials.
 
         Returns:
             Engine: SQLAlchemy engine object for database connection.
@@ -50,12 +50,12 @@ class DatabaseConnector:
             credentials = self.read_db_credentials(creds_file)
 
             if db_key not in credentials:
-                raise KeyError(f"Database key '{db_key}' not found in credentials file.")
+                raise KeyError(
+                    f"Database key '{db_key}' not found in credentials file.")
 
             db_creds = credentials[db_key]
             connection_string = (
-                f"postgresql+psycopg2://{db_creds['RDS_USER']}:{db_creds['RDS_PASSWORD']}"
-                f"@{db_creds['RDS_HOST']}:{db_creds['RDS_PORT']}/{db_creds['RDS_DATABASE']}"
+                f"postgresql+psycopg2://{db_creds['RDS_USER']}:{db_creds['RDS_PASSWORD']}@{db_creds['RDS_HOST']}:{db_creds['RDS_PORT']}/{db_creds['RDS_DATABASE']}"
             )
             engine = create_engine(connection_string)
             print(f"Database engine for '{db_key}' initialized successfully.")
@@ -67,23 +67,24 @@ class DatabaseConnector:
             print(f"Error initializing database engine: {error}")
             raise
 
-    def list_database_tables(self, engine: Engine) -> List[str]:
+    def fetch_data(self, table_name: str, engine: Engine) -> pd.DataFrame:
         """
-        List all tables in the connected database.
+        Fetch data from the database table into a Pandas DataFrame.
 
         Args:
+            table_name (str): Name of the table to fetch from the database.
             engine (Engine): SQLAlchemy engine object.
 
         Returns:
-            List[str]: A list of table names in the database.
+            pd.DataFrame: DataFrame containing the data from the specified table.
         """
         try:
-            inspector = inspect(engine)
-            tables = inspector.get_table_names()
-            print(f"Tables in the database: {tables}")
-            return tables
+            query = f"SELECT * FROM {table_name};"
+            data_frame = pd.read_sql(query, engine)
+            print(f"Data successfully pulled from table '{table_name}'.")
+            return data_frame
         except Exception as error:
-            print(f"Error listing database tables: {error}")
+            print(f"Error fetching data from table '{table_name}': {error}")
             raise
 
     def upload_dataframe(self, df: pd.DataFrame, table_name: str, engine: Engine, if_exists: str = "replace", index: bool = False):
@@ -118,20 +119,8 @@ class DatabaseConnector:
         """
         try:
             engine = self.initialize_db_engine(creds_file, db_key)
-            self.upload_dataframe(df, table_name, engine, if_exists=if_exists, index=index)
+            self.upload_dataframe(df, table_name, engine,
+                                  if_exists=if_exists, index=index)
         except Exception as error:
             print(f"Error uploading data to the database: {error}")
             raise
-
-
-if __name__ == "__main__":
-    # Example usage
-    connector = DatabaseConnector()
-    example_df = pd.DataFrame({"column1": [1, 2], "column2": ["A", "B"]})
-    creds_path = "db_creds.yaml"
-    table_name = "example_table"
-
-    try:
-        connector.upload_data_to_db(example_df, table_name, creds_path, db_key="target_db")
-    except Exception as e:
-        print(f"Error during upload: {e}")
