@@ -6,8 +6,9 @@
 2. [Installation](#installation)
 3. [Usage](#usage)
 4. [Optimizations and Performance Improvements](#optimizations-and-performance-improvements)
-5. [File Structure](#file-structure)
-6. [License](#license)
+5. [SQL Queries](#sql-queries)
+6. [File Structure](#file-structure)
+7. [License](#license)
 
 ## Project Description
 
@@ -88,19 +89,10 @@ To run this project, follow these steps:
 To improve query performance, indexes were added to the necessary foreign key columns:
 
 ```sql
--- Add index on user_uuid in dim_users
 CREATE INDEX idx_user_uuid ON dim_users (user_uuid);
-
--- Add index on store_code in dim_store_details
 CREATE INDEX idx_store_code ON dim_store_details (store_code);
-
--- Add index on uuid in dim_products
 CREATE INDEX idx_product_uuid ON dim_products (uuid);
-
--- Add index on date_uuid in dim_date_times
 CREATE INDEX idx_date_uuid ON dim_date_times (date_uuid);
-
--- Add index on card_id in dim_card_details
 CREATE INDEX idx_card_id ON dim_card_details (card_id);
 ```
 
@@ -109,24 +101,14 @@ CREATE INDEX idx_card_id ON dim_card_details (card_id);
 Instead of inserting all records at once, batch inserts were implemented to improve efficiency. Example:
 
 ```sql
-INSERT INTO orders_table (
-    user_uuid, store_code, product_uuid, card_id, date_uuid, order_date, total_amount, status
-)
-SELECT
-    u.user_uuid,
-    s.store_code,
-    p.uuid AS product_uuid,
-    c.card_id,
-    dt.date_uuid,
-    CURRENT_DATE,
-    100.50,
-    'pending'
+INSERT INTO orders_table (user_uuid, store_code, product_uuid, card_id, date_uuid, order_date, total_amount, status)
+SELECT u.user_uuid, s.store_code, p.uuid AS product_uuid, c.card_id, dt.date_uuid, CURRENT_DATE, 100.50, 'pending'
 FROM dim_users u
 JOIN dim_store_details s ON s.store_code IS NOT NULL
 JOIN dim_products p ON p.uuid IS NOT NULL
 JOIN dim_card_details c ON c.card_id IS NOT NULL
 JOIN dim_date_times dt ON dt.date_uuid IS NOT NULL
-LIMIT 100;  -- Process smaller batches to improve performance
+LIMIT 100;
 ```
 
 ### 3. Checked Query Execution Plan
@@ -135,15 +117,7 @@ To analyze query performance and optimize slow queries, the `EXPLAIN ANALYZE` co
 
 ```sql
 EXPLAIN ANALYZE
-SELECT
-    u.user_uuid,
-    s.store_code,
-    p.uuid AS product_uuid,
-    c.card_id,
-    dt.date_uuid,
-    CURRENT_DATE,
-    100.50,
-    'pending'
+SELECT u.user_uuid, s.store_code, p.uuid AS product_uuid, c.card_id, dt.date_uuid, CURRENT_DATE, 100.50, 'pending'
 FROM dim_users u
 JOIN dim_store_details s ON s.store_code IS NOT NULL
 JOIN dim_products p ON p.uuid IS NOT NULL
@@ -151,16 +125,37 @@ JOIN dim_card_details c ON c.card_id IS NOT NULL
 JOIN dim_date_times dt ON dt.date_uuid IS NOT NULL;
 ```
 
+## SQL Queries
+
+A collection of essential SQL queries used in this project:
+
+```sql
+-- Find the countries with the most physical stores
+SELECT country_code AS country, COUNT(*) AS total_no_stores FROM dim_store_details GROUP BY country_code ORDER BY total_no_stores DESC;
+
+-- Find the locations with the most stores
+SELECT locality, COUNT(*) AS total_no_stores FROM dim_store_details GROUP BY locality ORDER BY total_no_stores DESC;
+
+-- Find the months with the most sales
+SELECT SUM(sales_amount) AS total_sales, EXTRACT(MONTH FROM sales_date) AS month FROM sales_table GROUP BY month ORDER BY total_sales DESC;
+
+-- Compare online vs offline sales
+SELECT COUNT(*) AS numbers_of_sales, SUM(product_quantity) AS product_quantity_count, CASE WHEN location = 'Web' THEN 'Web' ELSE 'Offline' END AS location FROM sales_table GROUP BY location;
+
+-- Find the most revenue-generating store types in Germany
+SELECT SUM(sales_amount) AS total_sales, store_type, country_code FROM sales_table JOIN dim_store_details ON sales_table.store_code = dim_store_details.store_code WHERE country_code = 'DE' GROUP BY store_type, country_code ORDER BY total_sales DESC;
+```
+
 ## File Structure
 
 ```plaintext
-├── data_cleaning.py          # Functions for cleaning datasets
-├── data_extraction.py        # Functions for extracting data from various sources
-├── database_utils.py         # Database connection and utility functions
-├── db_creds.yaml             # YAML file for storing database credentials
-├── upload_cleaned_data.py    # Script to upload cleaned data to the target database
-├── optimizations.md          # Documentation on optimizations applied
-└── requirements.txt          # List of dependencies
+├── data_cleaning.py
+├── data_extraction.py
+├── database_utils.py
+├── db_creds.yaml
+├── upload_cleaned_data.py
+├── optimizations.md
+└── requirements.txt
 ```
 
 ## License
