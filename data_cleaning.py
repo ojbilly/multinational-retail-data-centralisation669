@@ -264,6 +264,38 @@ class DataCleaning:
         except Exception:
             return None
 
+    def clean_card_data(self, card_data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean the card details data by handling NULL values, removing duplicates, and ensuring proper formatting.
+
+        Args:
+            card_data (pd.DataFrame): DataFrame containing the card details.
+
+        Returns:
+            pd.DataFrame: Cleaned DataFrame.
+        """
+        # Replace "NULL" strings with actual NULL values
+        card_data.replace("NULL", pd.NA, inplace=True)
+
+        # Drop rows with any NULL values
+        card_data.dropna(inplace=True)
+
+        # Remove duplicate card numbers
+        if "card_number" in card_data.columns:
+            card_data.drop_duplicates(subset=["card_number"], inplace=True)
+
+            # Remove non-numeric card numbers
+            card_data = card_data[card_data["card_number"].str.isnumeric()]
+
+        # Convert 'date_payment_confirmed' to datetime
+        if "date_payment_confirmed" in card_data.columns:
+            card_data["date_payment_confirmed"] = pd.to_datetime(
+                card_data["date_payment_confirmed"], errors="coerce"
+            ).dt.date
+
+        print(f"Card data cleaned. Remaining rows: {len(card_data)}")
+        return card_data
+
     def clean_and_cast_card_details_data(self, card_details_data: pd.DataFrame) -> pd.DataFrame:
         """
         Clean and cast the data types of the columns in the dim_card_details data table.

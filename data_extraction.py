@@ -32,7 +32,8 @@ class DataExtractor:
             tables = connector.list_db_tables(engine)
 
             if table_name not in tables:
-                raise ValueError(f"Table '{table_name}' not found. Available tables: {tables}")
+                raise ValueError(
+                    f"Table '{table_name}' not found. Available tables: {tables}")
 
             data_frame = pd.read_sql_table(table_name, con=engine)
             print(f"Data successfully extracted from table: {table_name}")
@@ -52,7 +53,8 @@ class DataExtractor:
             pd.DataFrame: DataFrame containing extracted data.
         """
         try:
-            tables = read_pdf(pdf_url, pages="all", multiple_tables=True, stream=True)
+            tables = read_pdf(pdf_url, pages="all",
+                              multiple_tables=True, stream=True)
             data_frame = pd.concat(tables, ignore_index=True)
             print("Data successfully extracted from PDF.")
             return data_frame
@@ -82,6 +84,26 @@ class DataExtractor:
             print(f"Error fetching store count: {error}")
             raise
 
+    def retrieve_pdf_data(self, pdf_url: str) -> pd.DataFrame:
+        """
+        Extract data from a PDF file hosted at the provided URL and return it as a Pandas DataFrame.
+
+        Args:
+            pdf_url (str): URL of the PDF file.
+
+        Returns:
+            pd.DataFrame: DataFrame containing extracted data.
+        """
+        try:
+            tables = read_pdf(pdf_url, pages="all",
+                              multiple_tables=True, stream=True)
+            data_frame = pd.concat(tables, ignore_index=True)
+            print(f"Data successfully extracted from PDF: {pdf_url}")
+            return data_frame
+        except Exception as error:
+            print(f"Error extracting data from PDF: {error}")
+            raise
+
     def fetch_store_data(self, store_endpoint: str, headers: Dict[str, str], total_stores: int) -> pd.DataFrame:
         """
         Retrieve store data for a given number of stores.
@@ -97,7 +119,8 @@ class DataExtractor:
         store_data = []
         for store_id in range(1, total_stores + 1):
             try:
-                response = requests.get(store_endpoint.format(store_number=store_id), headers=headers)
+                response = requests.get(store_endpoint.format(
+                    store_number=store_id), headers=headers)
                 response.raise_for_status()
                 store_data.append(response.json())
             except requests.RequestException as error:
@@ -119,7 +142,8 @@ class DataExtractor:
             bucket, key = s3_path.replace("s3://", "").split("/", 1)
             s3_client = boto3.client("s3")
             obj = s3_client.get_object(Bucket=bucket, Key=key)
-            data_frame = pd.read_csv(StringIO(obj["Body"].read().decode("utf-8")))
+            data_frame = pd.read_csv(
+                StringIO(obj["Body"].read().decode("utf-8")))
             print(f"Data successfully extracted from S3: {s3_path}")
             return data_frame
         except Exception as error:
